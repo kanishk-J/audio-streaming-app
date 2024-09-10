@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        h1 { text-align: center; }
+        #albumList, #songList { list-style-type: none; padding: 0; }
+        #albumList li, #songList li { 
+            cursor: pointer; 
+            padding: 10px; 
+            margin: 5px 0; 
+            background-color: #f0f0f0; 
+            border-radius: 5px;
+        }
+        #player { margin-top: 20px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Music Player</h1>
+    <div id="albumPage">
+        <ul id="albumList"></ul>
+    </div>
+    <div id="songPage" class="hidden">
+        <h2 id="albumTitle"></h2>
+        <ul id="songList"></ul>
+        <button onclick="backToAlbums()">Back to Albums</button>
+    </div>
+    <div id="player" class="hidden">
+        <audio id="audioPlayer" controls></audio>
+    </div>
+
+    <script>
+        const songList = document.getElementById('songList');
+        const albumPage = document.getElementById('albumPage');
+        const songPage = document.getElementById('songPage');
+        const albumTitle = document.getElementById('albumTitle');
+        const audioPlayer = document.getElementById('audioPlayer');
+        const player = document.getElementById('player');
+
+        // Fetch songs
+        fetch('http://localhost:3000/music_files/list')
+            .then(response => response.json())
+            .then(songs => {
+                const albums = groupSongsByAlbum(songs);
+                displayAlbums(albums);
+            });
+
+        function groupSongsByAlbum(songs) {
+            return songs.reduce((albums, song) => {
+                if (!albums[song.album]) {
+                    albums[song.album] = [];
+                }
+                albums[song.album].push(song);
+                return albums;
+            }, {});
+        }
+
+        function displayAlbums(albums) {
+            const albumList = document.getElementById('albumList');
+            Object.entries(albums).forEach(([albumName, songs]) => {
+                const li = document.createElement('li');
+                li.textContent = `${albumName} (${songs.length} songs)`;
+                li.onclick = () => showSongs(albumName, songs);
+                albumList.appendChild(li);
+            });
+        }
+
+        function showSongs(albumName, songs) {
+            albumPage.classList.add('hidden');
+            songPage.classList.remove('hidden');
+            albumTitle.textContent = albumName;
+            songList.innerHTML = '';
+            songs.forEach(song => {
+                const li = document.createElement('li');
+                li.textContent = song.title;
+                li.onclick = () => playSong(song.path);
+                songList.appendChild(li);
+            });
+        }
+
+        function playSong(songUrl) {
+            player.classList.remove('hidden');
+            
+            if (Hls.isSupported()) {
+                const hls = new Hls();
+                hls.loadSource(songUrl);
+                hls.attachMedia(audioPlayer);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    audioPlayer.play();
+                });
+            } else if (audioPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                audioPlayer.src = songUrl;
+                audioPlayer.addEventListener('loadedmetadata', function() {
+                    audioPlayer.play();
+                });
+            }
+        }
+
+        function backToAlbums() {
+            songPage.classList.add('hidden');
+            albumPage.classList.remove('hidden');
+            player.classList.add('hidden');
+            audioPlayer.pause();
+        }
+    </script>
+</body>
+</html>
